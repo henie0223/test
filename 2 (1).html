@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>뉴턴의 제2법칙 시뮬레이터</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    /* 트랙 위의 상자가 부드럽게 움직이도록 최적화 */
+    .box-container {
+      will-change: left;
+    }
+  </style>
+</head>
+<body class="bg-slate-900 font-sans text-slate-100 min-h-screen flex flex-col items-center py-10 px-4">
+
+  <div class="max-w-5xl w-full bg-slate-800 rounded-3xl shadow-2xl overflow-hidden border border-slate-700">
+    
+    <!-- 헤더 -->
+    <div class="bg-gradient-to-r from-indigo-600 to-violet-600 p-6 flex flex-col md:flex-row justify-between items-center text-center md:text-left shadow-lg">
+      <div>
+        <h1 class="text-3xl font-extrabold mb-2 tracking-tight">🔬 뉴턴의 운동 제2법칙 시뮬레이터</h1>
+        <p class="text-indigo-100 font-medium">F = ma (힘 = 질량 × 가속도)를 직접 눈으로 확인해 보세요!</p>
+      </div>
+      
+      <!-- 점수판 -->
+      <div class="mt-4 md:mt-0 bg-white/20 px-5 py-3 rounded-xl backdrop-blur-sm border border-white/30 flex items-center shadow-inner">
+        <span class="text-indigo-100 font-bold mr-3">연속 성공 점수:</span>
+        <span class="text-3xl font-extrabold text-white"><span id="score-display">0</span> <span class="text-lg">점</span></span>
+      </div>
+    </div>
+
+    <div class="p-6 lg:p-8 grid grid-cols-1 lg:grid-cols-12 gap-8">
+      
+      <!-- 왼쪽: 물리 시뮬레이션 트랙 (7 cols) -->
+      <div class="lg:col-span-7 flex flex-col justify-between space-y-6">
+        
+        <!-- 메인 운동장 (트랙) -->
+        <div class="h-72 bg-slate-950 rounded-2xl border-2 border-slate-700 relative overflow-hidden flex flex-col justify-between p-4 shadow-inner">
+          
+          <!-- 상단 현재 정보 태그 -->
+          <div class="flex justify-between items-center text-xs font-semibold text-slate-400 z-10">
+            <span>트랙 길이: 200m (-100m ~ +100m)</span>
+            <span class="text-indigo-400">기준점(0m)은 트랙 한가운데입니다.</span>
+          </div>
+
+          <!-- 중앙 수평 트랙선 -->
+          <div class="absolute left-0 right-0 top-1/2 -translate-y-1/2 h-1 bg-slate-800 flex justify-between px-8">
+            <div class="relative h-4 w-px bg-slate-700 -top-1.5 flex flex-col items-center"><span class="text-[10px] text-slate-500 mt-3 font-mono">-100m</span></div>
+            <div class="relative h-4 w-px bg-slate-700 -top-1.5 flex flex-col items-center"><span class="text-[10px] text-slate-500 mt-3 font-mono">-50m</span></div>
+            <div class="relative h-4 w-px bg-slate-700 -top-1.5 flex flex-col items-center"><span class="text-[10px] text-slate-500 mt-3 font-mono">0m</span></div>
+            <div class="relative h-4 w-px bg-slate-700 -top-1.5 flex flex-col items-center"><span class="text-[10px] text-slate-500 mt-3 font-mono">50m</span></div>
+            <div class="relative h-4 w-px bg-slate-700 -top-1.5 flex flex-col items-center"><span class="text-[10px] text-slate-500 mt-3 font-mono">100m</span></div>
+          </div>
+
+          <!-- 시각화 요소: 힘 화살표와 움직이는 상자 -->
+          <div class="absolute inset-x-8 top-1/2 -translate-y-1/2 h-20">
+            <div id="box-container" class="box-container absolute top-1/2" style="left: 50%; transform: translate3d(-50%, -50%, 0);">
+              
+              <!-- 힘을 가하는 방향 화살표 -->
+              <div id="force-arrow-container" class="absolute -top-10 left-1/2 -translate-x-1/2 whitespace-nowrap flex flex-col items-center">
+                <span class="text-xs font-bold text-amber-400 mb-1"><span id="force-arrow-value">10</span> N</span>
+                <div class="flex items-center justify-center" id="force-arrow-graphic">
+                  <!-- JS로 채워짐 -->
+                </div>
+              </div>
+
+              <!-- 질량체 상자 -->
+              <div id="mass-box" class="w-16 h-16 bg-gradient-to-br from-indigo-500 to-indigo-700 rounded-xl border border-indigo-400 shadow-lg flex flex-col items-center justify-center relative">
+                <span class="text-[10px] font-bold text-indigo-200">MASS</span>
+                <span class="text-base font-extrabold text-white"><span id="box-mass-text">5</span>kg</span>
+                
+                <!-- 바퀴 장식 -->
+                <div class="absolute -bottom-1.5 left-2 w-3 h-3 bg-slate-700 rounded-full border border-slate-500"></div>
+                <div class="absolute -bottom-1.5 right-2 w-3 h-3 bg-slate-700 rounded-full border border-slate-500"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 하단 트랙 정보 표시 -->
+          <div class="flex justify-between items-end text-xs font-mono text-slate-500">
+            <span>왼쪽 경계 (-100m)</span>
+            <span>오른쪽 경계 (+100m)</span>
+          </div>
+        </div>
+
+        <!-- 게임 결과 메시지 -->
+        <div id="game-message" class="hidden p-4 rounded-2xl border-2 font-bold text-center shadow-lg animate-pulse">
+          <div id="game-success-content" class="hidden">
+            <span class="text-xl block mb-2">🎉 10초 버티기 성공! (+1점)</span>
+            <span id="fact-message" class="text-sm font-normal text-emerald-100"></span>
+          </div>
+          <div id="game-fail-content" class="hidden">
+            <span class="text-xl">💥 실패! 벽에 부딪혔습니다. (점수 초기화)</span>
+          </div>
+        </div>
+
+        <!-- 수치 카드 및 실시간 통계 -->
+        <div class="grid grid-cols-3 gap-4">
+          <div class="bg-slate-950 p-4 rounded-2xl border border-slate-700/50 flex flex-col">
+            <span class="text-xs text-slate-400 font-semibold mb-1">가속도 (a)</span>
+            <span class="text-xl lg:text-2xl font-extrabold font-mono text-amber-400">
+              <span id="accel-val">+2.00</span>
+              <span class="text-xs font-medium ml-1 text-slate-500">m/s²</span>
+            </span>
+          </div>
+          <div class="bg-slate-950 p-4 rounded-2xl border border-slate-700/50 flex flex-col">
+            <span class="text-xs text-slate-400 font-semibold mb-1">속도 (v)</span>
+            <span class="text-xl lg:text-2xl font-extrabold font-mono text-emerald-400">
+              <span id="vel-val">+0.00</span>
+              <span class="text-xs font-medium ml-1 text-slate-500">m/s</span>
+            </span>
+          </div>
+          <div class="bg-slate-950 p-4 rounded-2xl border border-slate-700/50 flex flex-col">
+            <span class="text-xs text-slate-400 font-semibold mb-1">현재 위치 (x)</span>
+            <span class="text-xl lg:text-2xl font-extrabold font-mono text-sky-400">
+              <span id="pos-val">+0.00</span>
+              <span class="text-xs font-medium ml-1 text-slate-500">m</span>
+            </span>
+          </div>
+        </div>
+
+        <!-- 메인 동작 제어 버튼 -->
+        <div class="grid grid-cols-2 gap-4">
+          <button id="start-btn" class="py-4 px-6 rounded-2xl font-bold text-lg shadow-lg transition-transform active:scale-95 bg-indigo-600 hover:bg-indigo-500 text-white">
+            시작 (Start)
+          </button>
+          <button id="reset-btn" class="py-4 px-6 bg-slate-700 hover:bg-slate-600 text-white font-bold rounded-2xl text-lg shadow-lg transition-transform active:scale-95">
+            초기화 (Reset)
+          </button>
+        </div>
+
+      </div>
+
+      <!-- 오른쪽: 조작 슬라이더 및 설명서 (5 cols) -->
+      <div class="lg:col-span-5 flex flex-col justify-between space-y-6">
+        
+        <!-- 실험 조작 보드 -->
+        <div class="bg-slate-950 p-6 rounded-2xl border border-slate-800 space-y-6">
+          <h2 class="text-lg font-bold text-indigo-300 border-b border-slate-800 pb-2">실험 세팅하기</h2>
+
+          <!-- 질량 슬라이더 -->
+          <div class="space-y-2">
+            <div class="flex justify-between text-sm">
+              <span class="text-slate-400 font-semibold">질량 (Mass, m)</span>
+              <span class="text-indigo-400 font-mono font-bold"><span id="mass-label">5</span> kg</span>
+            </div>
+            <input type="range" id="mass-slider" min="1" max="20" step="1" value="5" class="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-indigo-500">
+            <div class="flex justify-between text-[10px] text-slate-600 font-mono">
+              <span>1kg (가벼움)</span>
+              <span>20kg (무거움)</span>
+            </div>
+          </div>
+
+          <!-- 힘 슬라이더 -->
+          <div class="space-y-2">
+            <div class="flex justify-between text-sm">
+              <span class="text-slate-400 font-semibold">힘의 크기 (Force, F)</span>
+              <span class="text-amber-400 font-mono font-bold"><span id="force-label">10</span> N</span>
+            </div>
+            <input type="range" id="force-slider" min="0" max="50" step="1" value="10" class="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-amber-500">
+            <div class="flex justify-between text-[10px] text-slate-600 font-mono">
+              <span>0N (힘 없음)</span>
+              <span>50N (강함)</span>
+            </div>
+          </div>
+
+          <!-- 방향 선택 버튼 -->
+          <div class="space-y-2">
+            <span class="text-slate-400 text-sm font-semibold block">힘의 방향 (Direction)</span>
+            <div class="grid grid-cols-2 gap-3">
+              <button id="dir-left-btn" class="py-3 px-4 rounded-xl font-bold text-sm flex items-center justify-center space-x-2 transition-all bg-slate-800 text-slate-400 hover:bg-slate-750">
+                <span>⬅️</span>
+                <span>왼쪽 방향 (-F)</span>
+              </button>
+              <button id="dir-right-btn" class="py-3 px-4 rounded-xl font-bold text-sm flex items-center justify-center space-x-2 transition-all bg-amber-500 text-slate-950 shadow-md scale-102">
+                <span>오른쪽 방향 (+F)</span>
+                <span>➡️</span>
+              </button>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- 물리 법칙 학습 정보 -->
+        <div class="bg-gradient-to-br from-slate-950 to-slate-900 border border-slate-800 p-5 rounded-2xl space-y-3 shadow-md">
+          <h3 class="text-sm font-bold text-violet-400 flex items-center">
+            <span class="mr-1.5">🎓</span>
+            학습 가이드: 뉴턴의 제2법칙
+          </h3>
+          <p class="text-xs text-slate-300 leading-relaxed">
+            물체에 힘 F가 작용하면, 물체에는 힘의 방향으로 가속도 a가 생깁니다. 이 가속도의 크기는 <strong>가해준 힘(F)에 비례</strong>하고 <strong>물체의 질량(m)에 반비례</strong>합니다.
+          </p>
+          <div class="bg-slate-900/80 p-3 rounded-xl text-center border border-slate-800/80">
+            <code class="text-sm font-mono font-bold text-indigo-300">a = F / m</code>
+          </div>
+          <ul class="text-[11px] text-slate-400 space-y-1.5 list-disc pl-4">
+            <li><strong>🎮 10초 버티기 챌린지:</strong> 힘과 방향을 이리저리 바꾸며 10초 동안 벽에 닿지 않게 살아남아 보세요!</li>
+            <li><strong>힘(F)을 키우면:</strong> 상자가 더 빠르게 가속되어 속도의 변화율이 가팔라집니다.</li>
+            <li><strong>질량(m)을 늘리면:</strong> 관성이 커져 같은 힘을 주어도 속도가 느리게 변화합니다.</li>
+            <li><strong>경과 시간(t):</strong> <span class="font-mono text-violet-400"><span id="time-val">0.00</span> / 10.00 초</span></li>
+          </ul>
+        </div>
+
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    // 물리 기본 상수
+    const TRACK_LENGTH = 200; 
+    const HALF_TRACK = TRACK_LENGTH / 2; // 100m
+    
+    // 상태 변수
+    let mass = 5;
+    let force = 10;
+    let direction = 1;
+    let position = 0;
+    let velocity = 0;
+    let acceleration = 2;
+    let time = 0;
+    let isRunning = false;
+    let score = 0;
+    let gameStatus = 'idle'; // 'idle', 'playing', 'success', 'fail'
+
+    // 애니메이션 제어
+    let animationFrameId = null;
+    let lastTime = 0;
+
+    // 역사적 사실 문구
+    const historicalFacts = [
+      "뉴턴은 1687년 '프린키피아(Principia)'라는 책에서 이 가속도의 법칙을 처음 세상에 발표했습니다.",
+      "뉴턴의 제2법칙 덕분에 오늘날 우리는 자동차의 브레이크가 얼마나 빨리 차를 멈출 수 있는지 정확히 계산할 수 있습니다.",
+      "이 법칙은 수백 년이 지난 지금도 우주선이 지구의 중력을 뚫고 우주로 발사되는 원리를 설명하는 데 핵심적으로 쓰입니다.",
+      "갈릴레오가 기초를 다진 관성의 개념을 뉴턴이 수학적으로 완벽하게 정리한 것이 바로 이 운동 제2법칙입니다."
+    ];
+
+    // DOM 요소 가져오기
+    const boxContainer = document.getElementById('box-container');
+    const massBox = document.getElementById('mass-box');
+    const boxMassText = document.getElementById('box-mass-text');
+    const forceArrowContainer = document.getElementById('force-arrow-container');
+    const forceArrowValue = document.getElementById('force-arrow-value');
+    const forceArrowGraphic = document.getElementById('force-arrow-graphic');
+    
+    const accelVal = document.getElementById('accel-val');
+    const velVal = document.getElementById('vel-val');
+    const posVal = document.getElementById('pos-val');
+    const timeVal = document.getElementById('time-val');
+    const scoreDisplay = document.getElementById('score-display');
+    
+    const startBtn = document.getElementById('start-btn');
+    const resetBtn = document.getElementById('reset-btn');
+    const dirLeftBtn = document.getElementById('dir-left-btn');
+    const dirRightBtn = document.getElementById('dir-right-btn');
+    
+    const massSlider = document.getElementById('mass-slider');
+    const forceSlider = document.getElementById('force-slider');
+    const massLabel = document.getElementById('mass-label');
+    const forceLabel = document.getElementById('force-label');
+
+    const gameMessage = document.getElementById('game-message');
+    const gameSuccessContent = document.getElementById('game-success-content');
+    const gameFailContent = document.getElementById('game-fail-content');
+    const factMessageEl = document.getElementById('fact-message');
+
+    // UI 업데이트 함수
+    function updateDOM() {
+      // 숫자 포맷팅 함수
+      const formatNumber = (num) => num >= 0 ? `+${num.toFixed(2)}` : num.toFixed(2);
+
+      // 상자 위치 및 크기 업데이트
+      const positionPercent = ((position + HALF_TRACK) / TRACK_LENGTH) * 100;
+      boxContainer.style.left = `${positionPercent}%`;
+      massBox.style.transform = `scale(${0.8 + (mass / 20) * 0.4})`;
+      boxMassText.innerText = mass;
+
+      // 수치 텍스트 업데이트
+      acceleration = (force * direction) / mass;
+      accelVal.innerText = formatNumber(acceleration);
+      velVal.innerText = formatNumber(velocity);
+      posVal.innerText = formatNumber(position);
+      timeVal.innerText = time.toFixed(2);
+      scoreDisplay.innerText = score;
+
+      // 화살표 렌더링
+      if (force > 0) {
+        forceArrowContainer.style.display = 'flex';
+        forceArrowValue.innerText = force;
+        if (direction === 1) {
+          forceArrowGraphic.innerHTML = `
+            <div class="h-2 w-10 bg-amber-500 rounded-l"></div>
+            <div class="w-0 h-0 border-t-8 border-b-8 border-l-8 border-t-transparent border-b-transparent border-l-amber-500" style="border-top-width: 6px; border-bottom-width: 6px;"></div>
+          `;
+        } else {
+          forceArrowGraphic.innerHTML = `
+            <div class="w-0 h-0 border-t-8 border-b-8 border-r-8 border-t-transparent border-b-transparent border-r-amber-500" style="border-top-width: 6px; border-bottom-width: 6px;"></div>
+            <div class="h-2 w-10 bg-amber-500 rounded-r"></div>
+          `;
+        }
+      } else {
+        forceArrowContainer.style.display = 'none';
+      }
+
+      // 버튼 및 방향 표시 상태
+      if (direction === 1) {
+        dirRightBtn.className = "py-3 px-4 rounded-xl font-bold text-sm flex items-center justify-center space-x-2 transition-all bg-amber-500 text-slate-950 shadow-md scale-102";
+        dirLeftBtn.className = "py-3 px-4 rounded-xl font-bold text-sm flex items-center justify-center space-x-2 transition-all bg-slate-800 text-slate-400 hover:bg-slate-750";
+      } else {
+        dirLeftBtn.className = "py-3 px-4 rounded-xl font-bold text-sm flex items-center justify-center space-x-2 transition-all bg-amber-500 text-slate-950 shadow-md scale-102";
+        dirRightBtn.className = "py-3 px-4 rounded-xl font-bold text-sm flex items-center justify-center space-x-2 transition-all bg-slate-800 text-slate-400 hover:bg-slate-750";
+      }
+
+      // 시작/정지 버튼 상태
+      if (isRunning) {
+        startBtn.innerText = "정지 (Pause)";
+        startBtn.className = "py-4 px-6 rounded-2xl font-bold text-lg shadow-lg transition-transform active:scale-95 bg-rose-600 hover:bg-rose-500 text-white";
+      } else {
+        startBtn.innerText = "시작 (Start)";
+        startBtn.className = "py-4 px-6 rounded-2xl font-bold text-lg shadow-lg transition-transform active:scale-95 bg-indigo-600 hover:bg-indigo-500 text-white";
+      }
+
+      // 게임 메시지 배너 표시
+      if (gameStatus === 'success' || gameStatus === 'fail') {
+        gameMessage.style.display = 'block';
+        if (gameStatus === 'success') {
+          gameMessage.className = "p-4 rounded-2xl border-2 font-bold text-center shadow-lg animate-pulse bg-emerald-900/50 border-emerald-500 text-emerald-300 mt-4";
+          gameSuccessContent.style.display = 'block';
+          gameFailContent.style.display = 'none';
+        } else {
+          gameMessage.className = "p-4 rounded-2xl border-2 font-bold text-center shadow-lg animate-pulse bg-rose-900/50 border-rose-500 text-rose-300 mt-4";
+          gameSuccessContent.style.display = 'none';
+          gameFailContent.style.display = 'block';
+        }
+      } else {
+        gameMessage.style.display = 'none';
+      }
+    }
+
+    // 애니메이션 루프
+    function updateSimulation(currentTime) {
+      if (!lastTime) {
+        lastTime = currentTime;
+        animationFrameId = requestAnimationFrame(updateSimulation);
+        return;
+      }
+
+      const deltaTime = (currentTime - lastTime) / 1000;
+      lastTime = currentTime;
+      const cappedDeltaTime = Math.min(deltaTime, 0.1);
+
+      // 물리 계산
+      const currentAccel = (force * direction) / mass;
+      velocity += currentAccel * cappedDeltaTime;
+      position += velocity * cappedDeltaTime;
+      time += cappedDeltaTime;
+
+      // 10초 버티기 성공 조건
+      if (time >= 10) {
+        time = 10;
+        isRunning = false;
+        gameStatus = 'success';
+        score += 1;
+        factMessageEl.innerText = historicalFacts[Math.floor(Math.random() * historicalFacts.length)];
+        updateDOM();
+        return;
+      }
+
+      // 경계 충돌 감지 (실패 조건)
+      let hitBoundary = false;
+      if (position >= HALF_TRACK) {
+        position = HALF_TRACK;
+        hitBoundary = true;
+      } else if (position <= -HALF_TRACK) {
+        position = -HALF_TRACK;
+        hitBoundary = true;
+      }
+
+      if (hitBoundary) {
+        isRunning = false;
+        gameStatus = 'fail';
+        score = 0;
+        velocity = 0;
+      } else {
+        animationFrameId = requestAnimationFrame(updateSimulation);
+      }
+
+      updateDOM();
+    }
+
+    // 이벤트 리스너: 제어 버튼 및 슬라이더
+    startBtn.addEventListener('click', () => {
+      if (position >= HALF_TRACK || position <= -HALF_TRACK || gameStatus === 'success' || gameStatus === 'fail') {
+        doReset();
+        gameStatus = 'playing';
+        setTimeout(() => {
+          isRunning = true;
+          lastTime = 0;
+          animationFrameId = requestAnimationFrame(updateSimulation);
+          updateDOM();
+        }, 50);
+      } else {
+        if (!isRunning) {
+          gameStatus = 'playing';
+          isRunning = true;
+          lastTime = 0;
+          animationFrameId = requestAnimationFrame(updateSimulation);
+        } else {
+          isRunning = false;
+          cancelAnimationFrame(animationFrameId);
+        }
+        updateDOM();
+      }
+    });
+
+    function doReset() {
+      isRunning = false;
+      cancelAnimationFrame(animationFrameId);
+      gameStatus = 'idle';
+      position = 0;
+      velocity = 0;
+      time = 0;
+      lastTime = 0;
+      updateDOM();
+    }
+
+    resetBtn.addEventListener('click', doReset);
+
+    dirLeftBtn.addEventListener('click', () => { direction = -1; updateDOM(); });
+    dirRightBtn.addEventListener('click', () => { direction = 1; updateDOM(); });
+
+    massSlider.addEventListener('input', (e) => {
+      mass = parseInt(e.target.value);
+      massLabel.innerText = mass;
+      updateDOM();
+    });
+
+    forceSlider.addEventListener('input', (e) => {
+      force = parseInt(e.target.value);
+      forceLabel.innerText = force;
+      updateDOM();
+    });
+
+    // 초기 화면 렌더링
+    updateDOM();
+  </script>
+</body>
+</html>
